@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#06121a">
+<title>MELICE Remote</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: a "device" column (her live screen, mood, meters) that stays put, and a tabbed workbench beside it.
+   On a phone the device sits on top and the tabs stick under it. Single dark look: her screen is an OLED. */
+:root{
+  --bg:#06121a; --panel:#0b1c26; --panel2:#0f2531; --line:#1b3644; --ink:#e6f4f8; --mute:#86a3af; --dim:#4f6c78;
+  --cy:#7ee6ff; --cy-ink:#03222b; --pk:#ff8fc7; --warn:#ff7a66; --ok:#5ee6a0;
+  --f-display:"Chakra Petch","Segoe UI",system-ui,sans-serif; --f-body:"Manrope",system-ui,-apple-system,Roboto,sans-serif; --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  --r:14px; color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{background:var(--bg);color:var(--ink)}
+body{margin:0;font:15px/1.45 var(--f-body);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding-block:18px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+.logo{font:700 26px/1 var(--f-display);letter-spacing:.14em}
+.logo small{display:block;font:500 11px/1 var(--f-body);letter-spacing:.24em;color:var(--mute);margin-top:6px}
+.conn{margin-left:auto;display:flex;align-items:center;gap:8px;padding:7px 12px;border:1px solid var(--line);border-radius:99px;background:var(--panel);font-size:13px;color:var(--mute)}
+.conn i{width:9px;height:9px;border-radius:50%;background:var(--dim)}
+.conn.ok i{background:var(--ok);box-shadow:0 0 10px var(--ok)}.conn.bad i{background:var(--warn)}
+.grid{display:grid;grid-template-columns:minmax(0,400px) minmax(0,1fr);gap:22px;align-items:start}
+@media (max-width:880px){.grid{grid-template-columns:minmax(0,1fr)}}
+/* device column */
+.device{position:sticky;top:calc(env(safe-area-inset-top,0px) + 14px);display:grid;gap:12px}
+@media (max-width:880px){.device{position:static}}
+.bezel{background:linear-gradient(160deg,#10222c,#08151c);border:1px solid var(--line);border-radius:22px;padding:14px 14px 12px;box-shadow:0 18px 40px -24px #000}
+.bezel canvas{display:block;width:100%;max-width:100%;aspect-ratio:2/1;image-rendering:pixelated;border-radius:6px;background:#02070a;touch-action:none;cursor:pointer}
+.bezel .pins{display:flex;justify-content:space-between;margin-top:10px;font:500 10.5px var(--f-mono);color:var(--dim);letter-spacing:.08em}
+.status{display:flex;gap:8px;flex-wrap:wrap}
+.chip{padding:5px 11px;border-radius:99px;background:var(--panel);border:1px solid var(--line);font-size:13px;color:var(--ink)}
+.chip b{color:var(--cy);font-weight:600}
+.thought{min-height:22px;color:var(--cy);font-size:14px}
+.meters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.meter{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px;color:var(--mute)}
+.meter .bar{height:6px;border-radius:9px;background:#14303e;margin-top:6px;overflow:hidden}.meter .bar span{display:block;height:100%;width:0;background:var(--cy);transition:width .4s}
+.meter.h span{background:var(--pk)}.meter.a span{background:var(--warn)}
+.quick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+/* workbench */
+.tabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:5px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 8px);z-index:5}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:1 0 auto;border:0;background:none;color:var(--mute);font:600 14px var(--f-body);padding:9px 14px;border-radius:9px;cursor:pointer;white-space:nowrap}
+.tab[aria-selected="true"]{background:var(--cy);color:var(--cy-ink)}
+.tab:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--cy);outline-offset:2px}
+.view{display:grid;gap:14px;margin-top:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.card h2{font:600 15px var(--f-display);letter-spacing:.1em;text-transform:uppercase;margin:0 0 4px;color:var(--ink)}
+.card p.sub{margin:0 0 12px;color:var(--mute);font-size:13px}
+.btns{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.b{font:600 13px var(--f-body);color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 6px 10px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;user-select:none;transition:transform .08s,background .15s,border-color .15s}
+.b .ic{font-size:24px;line-height:1}
+.b:hover{border-color:#2c5466}.b:active,.b.hold{transform:scale(.97);background:#153644;border-color:var(--cy)}
+.b.warn{border-color:#4d2a26}
+.primary{font:700 14px var(--f-body);background:var(--cy);color:var(--cy-ink);border:0;border-radius:11px;padding:11px 18px;cursor:pointer}
+.ghost{font:600 13px var(--f-body);background:none;color:var(--mute);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+input,select,textarea{font:inherit;color:var(--ink);background:#061019;border:1px solid var(--line);border-radius:11px;padding:11px 12px;min-width:0}
+textarea{width:100%;resize:vertical;min-height:84px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chips button{font:500 12.5px var(--f-body);background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:99px;padding:6px 11px;cursor:pointer}
+.count{font:500 12px var(--f-mono);color:var(--dim)}
+.seg{display:flex;background:#061019;border:1px solid var(--line);border-radius:11px;overflow:hidden}
+.seg button{flex:1;border:0;background:none;color:var(--mute);font:600 13px var(--f-body);padding:10px 4px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--cy);color:var(--cy-ink)}
+.set{display:grid;gap:6px;margin-bottom:14px}.set label{font-size:13px;color:var(--mute)}
+.toggle{display:flex;align-items:center;justify-content:space-between;padding:11px 2px;border-top:1px solid var(--line)}
+.sw{width:46px;height:26px;border-radius:99px;background:#22343d;border:0;position:relative;cursor:pointer;flex:none}
+.sw::after{content:"";position:absolute;width:20px;height:20px;border-radius:50%;background:#fff;top:3px;left:3px;transition:left .2s}
+.sw[aria-checked="true"]{background:var(--cy)}.sw[aria-checked="true"]::after{left:23px}
+.big{font:700 26px var(--f-display);color:var(--cy);font-variant-numeric:tabular-nums}
+.live{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-top:10px}
+.live a,.del{color:var(--warn);font-size:13px;background:none;border:0;cursor:pointer;font-family:inherit}
+.answer{font:700 30px var(--f-display);color:var(--cy);text-align:center;min-height:42px;margin-top:10px;letter-spacing:.06em}
+#pad{display:block;width:100%;max-width:100%;aspect-ratio:2/1;image-rendering:pixelated;background:#02070a;border:2px dashed var(--line);border-radius:10px;touch-action:none;cursor:crosshair}
+.piano{display:flex;position:relative;height:130px;user-select:none}
+.piano .w{flex:1;background:#e9f5f8;border:1px solid #9ab;border-radius:0 0 9px 9px;margin:0 1px;display:flex;align-items:flex-end;justify-content:center;color:#456;font:600 11px var(--f-body);padding-bottom:7px;cursor:pointer}
+.piano .k{position:absolute;width:8.5%;height:62%;background:#0a1820;border:1px solid #2f4a57;border-radius:0 0 7px 7px;top:0;z-index:2;cursor:pointer}
+.piano .dn{background:var(--cy)!important}
+.rem{display:flex;align-items:center;gap:12px;padding:10px 2px;border-top:1px solid var(--line)}
+.rem b{font:600 15px var(--f-mono);color:var(--cy)}.rem span{flex:1;min-width:0;overflow-wrap:anywhere}.rem small{color:var(--mute)}
+.code{font:500 22px var(--f-mono);letter-spacing:.18em;color:var(--cy)}
+.note{font-size:13px;color:var(--mute)}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}@media (max-width:640px){.two{grid-template-columns:minmax(0,1fr)}}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#12303c;border:1px solid var(--cy);color:var(--ink);padding:9px 16px;border-radius:99px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:20}
+.overlay{position:fixed;inset:0;background:#06121ae8;display:grid;place-items:center;z-index:30;padding:20px}
+.overlay .card{max-width:430px;width:100%}
+.overlay input{width:100%;font:500 22px var(--f-mono);letter-spacing:.2em;text-align:center;text-transform:lowercase;margin:12px 0}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="logo">MELICE<small>REMOTE CONTROL</small></div>
+  <div class="conn" id="conn"><i></i><span id="connTxt">connecting…</span></div>
+</header>
+
+<div class="grid">
+  <!-- her -->
+  <section class="device" aria-label="MELICE">
+    <div class="bezel"><canvas id="scr" width="128" height="64" title="tap = boop, hold = pet"></canvas>
+      <div class="pins"><span>SSD1306 · 128×64</span><span>tap = boop · hold = pet</span></div></div>
+    <div class="status"><span class="chip">feeling <b id="sEmo">…</b></span><span class="chip">mood <b id="sMood">…</b></span><span class="chip" id="sScene" hidden></span></div>
+    <div class="thought" id="sThought"></div>
+    <div class="meters">
+      <div class="meter">Energy<div class="bar"><span id="mE"></span></div></div>
+      <div class="meter h">Happy<div class="bar"><span id="mH"></span></div></div>
+      <div class="meter a">Annoyed<div class="bar"><span id="mA"></span></div></div>
+    </div>
+    <div class="quick">
+      <button class="b" data-a="boop"><span class="ic">👉</span>Boop</button>
+      <button class="b" id="petBtn"><span class="ic">🫳</span>Pet</button>
+      <button class="b" data-a="hug"><span class="ic">🤗</span>Hug</button>
+      <button class="b" data-a="stop"><span class="ic">⏹️</span>Stop</button>
+    </div>
+  </section>
+
+  <!-- workbench -->
+  <section aria-label="Controls">
+    <nav class="tabs" role="tablist">
+      <button class="tab" role="tab" data-v="play" aria-selected="true">Play</button>
+      <button class="tab" role="tab" data-v="talk">Talk</button>
+      <button class="tab" role="tab" data-v="tools">Tools</button>
+      <button class="tab" role="tab" data-v="create">Create</button>
+      <button class="tab" role="tab" data-v="settings">Settings</button>
+    </nav>
+
+    <div class="view" data-view="play">
+      <div class="card"><h2>Touch</h2><p class="sub">The same as touching her pads and moving her.</p>
+        <div class="btns">
+          <button class="b" data-a="boop"><span class="ic">👉</span>Boop</button><button class="b" data-a="giggle"><span class="ic">🤭</span>Giggle</button>
+          <button class="b" data-a="hug"><span class="ic">🤗</span>Hug</button><button class="b" data-a="tickle"><span class="ic">🪶</span>Poke ×4</button>
+          <button class="b" data-a="shake"><span class="ic">🌀</span>Shake</button><button class="b" data-a="pickup"><span class="ic">🙌</span>Lift</button>
+          <button class="b" data-a="feed"><span class="ic">🍪</span>Feed</button><button class="b" data-a="sleep"><span class="ic">😴</span>Sleep</button>
+          <button class="b" data-a="wake"><span class="ic">⏰</span>Wake</button>
+        </div></div>
+      <div class="card"><h2>Shows</h2><p class="sub">She plays it to the end. Stop ends it early.</p>
+        <div class="btns">
+          <button class="b" data-a="joke"><span class="ic">🎤</span>Joke</button><button class="b" data-a="song"><span class="ic">🎶</span>Song</button>
+          <button class="b" data-a="adv"><span class="ic">🗺️</span>Adventure</button><button class="b" data-a="question"><span class="ic">❓</span>Ask me</button>
+          <button class="b" data-a="clock"><span class="ic">🕰️</span>Desk clock</button><button class="b warn" data-a="nuke"><span class="ic">☢️</span>Nuke</button>
+          <button class="b warn" data-a="death"><span class="ic">💀</span>Fake death</button>
+        </div></div>
+      <div class="two">
+        <div class="card"><h2>Make her feel</h2><p class="sub">She shows it for 10 seconds.</p>
+          <div class="row"><select id="emo" style="flex:1"></select><button class="primary" id="feel">Go</button></div></div>
+        <div class="card"><h2>Ask MELICE</h2><p class="sub">She answers on her screen too.</p>
+          <div class="btns" style="grid-template-columns:repeat(3,minmax(0,1fr))"><button class="b" data-ask="0"><span class="ic">🎱</span>Yes/No</button><button class="b" data-ask="1"><span class="ic">🪙</span>Coin</button><button class="b" data-ask="2"><span class="ic">🎲</span>Dice</button></div>
+          <div class="answer" id="answer"></div></div>
+      </div>
+    </div>
+
+    <div class="view" data-view="talk" hidden>
+      <div class="card"><h2>Say something</h2><p class="sub">Up to 160 letters. Long messages scroll in her bubble. English / Hinglish letters only: emoji and Hindi script are skipped.</p>
+        <textarea id="msg" maxlength="160" placeholder="good morning melice!"></textarea>
+        <div class="chips" id="phrases"></div>
+        <div class="row" style="margin-top:12px;justify-content:space-between"><span class="count" id="msgCount">0 / 160</span><button class="primary" id="send">Send</button></div></div>
+    </div>
+
+    <div class="view" data-view="tools" hidden>
+      <div class="two">
+        <div class="card"><h2>Timer</h2><p class="sub">An alarm rings on her. Touch her to stop it.</p>
+          <div class="btns" style="grid-template-columns:repeat(4,minmax(0,1fr))"><button class="b" data-t="60"><span class="ic">1</span>min</button><button class="b" data-t="300"><span class="ic">5</span>min</button><button class="b" data-t="600"><span class="ic">10</span>min</button><button class="b" data-t="1500"><span class="ic">25</span>min</button></div>
+          <div class="live" id="tmBox" hidden><span>rings in</span><span class="big" id="tmVal">0:00</span><button class="del" id="tmX">cancel</button></div></div>
+        <div class="card"><h2>Focus</h2><p class="sub">Pomodoro. She stays quiet while you work.</p>
+          <div class="btns" style="grid-template-columns:repeat(3,minmax(0,1fr))"><button class="b" data-p="25,5"><span class="ic">🍅</span>25 / 5</button><button class="b" data-p="50,10"><span class="ic">📚</span>50 / 10</button><button class="b" data-p="15,3"><span class="ic">⚡</span>15 / 3</button></div>
+          <div class="live" id="pmBox" hidden><span id="pmLbl">focus</span><span class="big" id="pmVal">0:00</span><button class="del" id="pmX">stop</button></div></div>
+      </div>
+      <div class="card"><h2>Water reminder</h2><p class="sub">“drink water! pani piyo :)”</p>
+        <div class="seg" id="water"><button data-v="0">Off</button><button data-v="30">30 min</button><button data-v="45">45 min</button><button data-v="60">1 hour</button></div></div>
+      <div class="card"><h2>Reminders</h2><p class="sub">At that time she rings and shows your text. Up to 5. Kept after restarts.</p>
+        <div class="row"><input type="time" id="rTime" value="09:00" style="flex:0 0 130px"><input id="rText" maxlength="40" placeholder="what to remind you" style="flex:1"></div>
+        <div class="row" style="margin-top:10px;justify-content:space-between"><label class="row note" style="gap:10px">every day <button class="sw" id="rDaily" role="switch" aria-checked="false" aria-label="every day"></button></label><button class="primary" id="rAdd">Add reminder</button></div>
+        <div id="rList" style="margin-top:10px"></div><p class="note" id="rNote"></p></div>
+    </div>
+
+    <div class="view" data-view="create" hidden>
+      <div class="card"><h2>Draw for her</h2><p class="sub">This pad is exactly her screen: 128 × 64 pixels. It stays on her screen for 8 seconds.</p>
+        <canvas id="pad" width="128" height="64"></canvas>
+        <div class="row" style="margin-top:10px"><button class="ghost" id="pen" aria-pressed="true">✏️ Pen</button><button class="ghost" id="eraser">🧽 Eraser</button><button class="ghost" id="clear">Clear</button><span style="flex:1"></span><button class="primary" id="drawSend">Send to MELICE</button></div></div>
+      <div class="card"><h2>Piano</h2><p class="sub">C6 to C7. She plays every key you press.</p><div class="piano" id="piano"></div></div>
+    </div>
+
+    <div class="view" data-view="settings" hidden>
+      <div class="two">
+        <div class="card"><h2>Her settings</h2>
+          <div class="set"><label>Sound</label><div class="seg" data-k="vol"><button>Off</button><button>Low</button><button>Mid</button><button>High</button></div></div>
+          <div class="set"><label>Brightness</label><div class="seg" data-k="bri"><button>Low</button><button>Mid</button><button>High</button></div></div>
+          <div class="set"><label>Chatter</label><div class="seg" data-k="chat"><button>Quiet</button><button>Normal</button><button>Chatty</button></div></div>
+          <div class="set"><label>Surprises</label><div class="seg" data-k="sur"><button>Off</button><button>Rare</button><button>Normal</button><button>Often</button></div></div>
+          <div class="toggle">Rude mode<button class="sw" data-k="rude" role="switch" aria-checked="false" aria-label="Rude mode"></button></div>
+          <div class="toggle">Thought bubbles<button class="sw" data-k="tho" role="switch" aria-checked="false" aria-label="Thought bubbles"></button></div>
+          <div class="toggle">Night mode, 11 pm – 7 am<button class="sw" data-k="night" role="switch" aria-checked="false" aria-label="Night mode"></button></div></div>
+        <div class="card"><h2>Connection</h2>
+          <p class="note" id="modeNote"></p>
+          <div class="set"><label>Device code</label><div class="code" id="codeShow">—</div></div>
+          <p class="note">Find it on MELICE: Menu → Phone link (last line). Anyone with this code can control her, so keep it to yourself.</p>
+          <div class="row" id="remoteOnly"><button class="ghost" id="changeCode">Change device</button></div>
+          <details style="margin-top:14px"><summary class="note" style="cursor:pointer">Advanced: relay server</summary>
+            <div class="row" style="margin-top:8px"><input id="relay" style="flex:1" placeholder="wss://broker.hivemq.com:8884/mqtt"><button class="ghost" id="relaySave">Save</button></div></details>
+          <p class="note" id="foot" style="margin-top:14px"></p></div>
+      </div>
+    </div>
+  </section>
+</div>
+</div>
+
+<div class="overlay" id="codeGate" hidden>
+  <div class="card"><h2>Connect to MELICE</h2>
+    <p class="sub">Type her 8-letter device code. On MELICE: hold B, tap B, then Menu → Phone link. The code is on the last line.</p>
+    <input id="codeIn" maxlength="8" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="abcd2345" aria-label="Device code">
+    <button class="primary" id="codeGo" style="width:100%">Connect</button>
+    <p class="note" id="codeErr"></p></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const store = { get(k, d) { try { return localStorage.getItem(k) ?? d } catch (e) { return d } }, set(k, v) { try { localStorage.setItem(k, v) } catch (e) {} } };
+const buzz = n => { try { navigator.vibrate && navigator.vibrate(n || 12) } catch (e) {} };
+let toastT = 0; function toast(m) { const e = $('#toast'); e.textContent = m; e.style.opacity = 1; clearTimeout(toastT); toastT = setTimeout(() => e.style.opacity = 0, 1500) }
+
+// ---------------------------------------------------------------- transport
+// Opened from MELICE herself (home WiFi): talk to her directly over HTTP.
+// Opened from anywhere else (the hosted website): go through the MQTT relay with her device code.
+const LOCAL = location.protocol === 'http:' && /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.|127\.|localhost$)|\.local$/.test(location.hostname);
+const DEFAULT_RELAY = 'wss://broker.hivemq.com:8884/mqtt';
+let S = {}, alive = false, onState = () => {};
+const T = { call: async () => null };
+
+async function http(path, body, ms) {
+  const c = new AbortController(), t = setTimeout(() => c.abort(), ms || 3000);
+  try { const r = await fetch('/' + path, body ? { method: 'POST', body, headers: { 'Content-Type': 'text/plain' }, signal: c.signal } : { cache: 'no-store', signal: c.signal }); if (!r.ok) throw 0; return await r.text() }
+  catch (e) { return null } finally { clearTimeout(t) }
+}
+function startLocal() {
+  T.call = async (path, body) => { let r = await http(path, body); if (r === null) r = await http(path, body); return r };
+  let miss = 0;
+  (async function loop() { const t = await http('s?fb=1', null, 2500); if (t) { miss = 0; try { onState(JSON.parse(t)) } catch (e) {} } else miss++; setConn(miss < 3 ? 'ok' : 'bad', miss < 3 ? 'Home WiFi · direct' : 'MELICE not answering'); setTimeout(loop, miss ? 1200 : 220) })();
+}
+function loadScript(src) { return new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s) }) }
+async function startRemote(code) {
+  setConn('', 'connecting to the relay…');
+  try { await loadScript('https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js') } catch (e) { setConn('bad', 'could not load the relay library'); return }
+  const base = 'melice/' + code + '/', pending = {}, url = store.get('melice.relay', '') || DEFAULT_RELAY;
+  const cl = mqtt.connect(url, { clientId: 'web-' + Math.random().toString(36).slice(2, 10), clean: true, keepalive: 30, reconnectPeriod: 2500, connectTimeout: 8000 });
+  let online = null, lastState = 0;
+  const show = () => { if (!cl.connected) return setConn('bad', 'relay offline · retrying'); if (online === false) return setConn('bad', 'MELICE is offline'); setConn(Date.now() - lastState < 5000 ? 'ok' : '', Date.now() - lastState < 5000 ? 'Remote · via relay' : 'waiting for MELICE…') };
+  cl.on('connect', () => { cl.subscribe([base + 'rep', base + 'st', base + 'on']); ping(); show() });
+  cl.on('close', show); cl.on('offline', show); cl.on('error', show);
+  cl.on('message', (topic, m) => {
+    const s = m.toString();
+    if (topic.endsWith('/rep')) { const i = s.indexOf(' '), id = s.slice(0, i); if (pending[id]) { pending[id](s.slice(i + 1)); delete pending[id] } }
+    else if (topic.endsWith('/st')) { lastState = Date.now(); online = true; try { onState(JSON.parse(s)) } catch (e) {} show() }
+    else if (topic.endsWith('/on')) { online = s === '1'; show() }
+  });
+  const rid = () => Math.random().toString(36).slice(2, 8);
+  function ping() { if (cl.connected) cl.publish(base + 'cmd', rid() + ' ping') }
+  setInterval(ping, 5000); setInterval(show, 2000);
+  T.call = (path, body) => new Promise(res => {
+    if (!cl.connected) return res(null);
+    const id = rid(); pending[id] = res;
+    cl.publish(base + 'cmd', path === 'draw' ? id + ' draw ' + body : id + ' ' + path);
+    setTimeout(() => { if (pending[id]) { delete pending[id]; res(null) } }, 7000);
+  });
+}
+function setConn(cls, txt) { const c = $('#conn'); c.className = 'conn ' + cls; $('#connTxt').textContent = txt; alive = cls === 'ok' }
+async function cmd(path, body, quiet) {
+  buzz();
+  const r = await T.call(path, body);
+  if (!quiet) toast(r === null ? 'MELICE did not answer' : r === 'busy' ? 'She is busy with a show. Tap Stop first.' : 'Sent');
+  return r;
+}
+
+// ---------------------------------------------------------------- live state
+const scr = $('#scr').getContext('2d'), img = scr.createImageData(128, 64);
+function drawFb(t) {
+  if (!t || t.length !== 2048) return;
+  const d = img.data;
+  for (let p = 0; p < 8; p++) for (let x = 0; x < 128; x++) { const v = parseInt(t.substr((p * 128 + x) * 2, 2), 16); for (let b = 0; b < 8; b++) { const o = ((p * 8 + b) * 128 + x) * 4, on = v >> b & 1; d[o] = on ? 126 : 3; d[o + 1] = on ? 230 : 9; d[o + 2] = on ? 255 : 13; d[o + 3] = 255 } }
+  scr.putImageData(img, 0, 0);
+}
+const fmt = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+let remSig = '';
+onState = st => {
+  S = st; drawFb(st.fb);
+  $('#sEmo').textContent = st.emo; $('#sMood').textContent = st.mood;
+  const sc = $('#sScene'); sc.hidden = !st.scene; sc.textContent = st.scene || '';
+  $('#sThought').textContent = st.th ? '💭 ' + st.th : '';
+  $('#mE').style.width = st.e + '%'; $('#mH').style.width = st.h + '%'; $('#mA').style.width = Math.min(100, st.a / 22 * 100) + '%';
+  ['vol', 'bri', 'chat', 'sur'].forEach(k => $$('.seg[data-k=' + k + '] button').forEach((b, i) => b.setAttribute('aria-pressed', i == st[k])));
+  ['rude', 'tho', 'night'].forEach(k => $('.sw[data-k=' + k + ']').setAttribute('aria-checked', !!st[k]));
+  $('#tmBox').hidden = !(st.timer > 0); $('#tmVal').textContent = fmt(st.timer || 0);
+  $('#pmBox').hidden = !st.pomo; $('#pmLbl').textContent = st.pomo == 1 ? '🍅 focus' : '☕ break'; $('#pmVal').textContent = fmt(st.pomoLeft || 0);
+  $$('#water button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.v === st.water));
+  if (st.code) $('#codeShow').textContent = st.code;
+  const sig = JSON.stringify(st.rem) + st.timeok; if (sig !== remSig) { remSig = sig; drawRems() }
+  $('#foot').textContent = [st.time, st.wx, st.net].filter(Boolean).join(' · ');
+};
+
+// ---------------------------------------------------------------- controls
+$$('[data-a]').forEach(b => b.addEventListener('click', () => cmd('a?do=' + b.dataset.a)));
+function holdToPet(el, tapAction) {
+  let t = 0, held = false;
+  el.addEventListener('pointerdown', e => { e.preventDefault(); held = false; el.classList.add('hold'); t = setTimeout(() => { held = true; cmd('a?do=pet', null, true); toast('Petting… let go to stop') }, tapAction ? 450 : 0) });
+  const end = () => { clearTimeout(t); el.classList.remove('hold'); if (held) cmd('a?do=unpet', null, true); else if (t && tapAction) cmd('a?do=' + tapAction); held = false; t = 0 };
+  el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end); el.addEventListener('pointerleave', () => { if (t || held) end() });
+}
+holdToPet($('#scr'), 'boop'); holdToPet($('#petBtn'), null);
+const EMOS = ["idle","happy","content","petted","boop","giggle","shy","curious","excited","love","annoyed","angry","furious","dizzy","unimpressed","bored","lonely","sleepy","asleep","groggy","worried","relieved","hello","tilted","knocked-out","rage","war","knocked","startled","falling","ouch","whee","spin","rocked","walk","seasick","sideways","held"];
+EMOS.forEach((n, i) => { if (i !== 24) { const o = document.createElement('option'); o.value = i; o.textContent = n; $('#emo').appendChild(o) } }); $('#emo').value = 9;
+$('#feel').onclick = () => cmd('a?do=emo&e=' + $('#emo').value);
+$$('[data-ask]').forEach(b => b.onclick = async () => { $('#answer').textContent = '…'; const r = await cmd('ask?k=' + b.dataset.ask, null, true); setTimeout(() => $('#answer').textContent = r || 'no answer', 1600) });
+// talk
+const msg = $('#msg'); msg.oninput = () => $('#msgCount').textContent = msg.value.length + ' / 160';
+['good morning melice!', 'i love you', 'time to sleep', 'great job today!', 'i\'m home!', 'miss you'].forEach(p => { const b = document.createElement('button'); b.textContent = p; b.onclick = () => { msg.value = p; msg.oninput() }; $('#phrases').appendChild(b) });
+$('#send').onclick = async () => { const v = msg.value.trim(); if (!v) return; const r = await cmd('say?t=' + encodeURIComponent(v)); if (r && r !== 'busy') { msg.value = ''; msg.oninput() } };
+// tools
+$$('[data-t]').forEach(b => b.onclick = () => cmd('timer?s=' + b.dataset.t)); $('#tmX').onclick = () => cmd('timer?s=0');
+$$('[data-p]').forEach(b => b.onclick = () => { const [f, br] = b.dataset.p.split(','); cmd('pomo?on=1&f=' + f + '&b=' + br) }); $('#pmX').onclick = () => cmd('pomo?on=0');
+$$('#water button').forEach(b => b.onclick = () => cmd('water?m=' + b.dataset.v));
+$('#rDaily').onclick = e => e.currentTarget.setAttribute('aria-checked', e.currentTarget.getAttribute('aria-checked') !== 'true');
+$('#rAdd').onclick = async () => { const [h, m] = $('#rTime').value.split(':'), t = $('#rText').value.trim() || 'reminder!'; const r = await cmd('rem?h=' + (+h) + '&m=' + (+m) + '&d=' + ($('#rDaily').getAttribute('aria-checked') === 'true' ? 1 : 0) + '&t=' + encodeURIComponent(t), null, true); if (r === 'full') toast('You already have 5 reminders'); else if (r) { $('#rText').value = ''; toast('Reminder added') } else toast('MELICE did not answer') };
+function drawRems() {
+  const l = $('#rList'); l.innerHTML = '';
+  (S.rem || []).forEach(r => { const d = document.createElement('div'); d.className = 'rem'; d.innerHTML = '<b></b><span></span><small></small><button class="del">delete</button>'; d.querySelector('b').textContent = String(r.h).padStart(2, '0') + ':' + String(r.m).padStart(2, '0'); d.querySelector('span').textContent = r.t; d.querySelector('small').textContent = r.d ? 'every day' : 'once'; d.querySelector('button').onclick = () => cmd('rem?del=' + r.i); l.appendChild(d) });
+  $('#rNote').textContent = S.timeok ? (S.rem && S.rem.length ? '' : 'No reminders yet.') : 'Reminders need the time, which MELICE gets from WiFi. It is not synced yet.';
+}
+// create: drawing pad
+const pad = $('#pad'), px = pad.getContext('2d'); let ink = 1, drawing = false, last = null;
+const clearPad = () => { px.fillStyle = '#02070a'; px.fillRect(0, 0, 128, 64) }; clearPad();
+const plot = (x, y) => { px.fillStyle = ink ? '#7ee6ff' : '#02070a'; const s = ink ? 2 : 6; px.fillRect(Math.round(x - s / 2), Math.round(y - s / 2), s, s) };
+const pos = e => { const r = pad.getBoundingClientRect(); return [(e.clientX - r.left) * 128 / r.width, (e.clientY - r.top) * 64 / r.height] };
+pad.addEventListener('pointerdown', e => { e.preventDefault(); drawing = true; last = pos(e); plot(...last) });
+pad.addEventListener('pointermove', e => { if (!drawing) return; const p = pos(e), n = Math.ceil(Math.hypot(p[0] - last[0], p[1] - last[1])); for (let i = 1; i <= n; i++) plot(last[0] + (p[0] - last[0]) * i / n, last[1] + (p[1] - last[1]) * i / n); last = p });
+['pointerup', 'pointercancel', 'pointerleave'].forEach(t => pad.addEventListener(t, () => drawing = false));
+$('#pen').onclick = () => { ink = 1; $('#pen').setAttribute('aria-pressed', true); $('#eraser').setAttribute('aria-pressed', false) };
+$('#eraser').onclick = () => { ink = 0; $('#eraser').setAttribute('aria-pressed', true); $('#pen').setAttribute('aria-pressed', false) };
+$('#clear').onclick = clearPad;
+$('#drawSend').onclick = () => { const d = px.getImageData(0, 0, 128, 64).data; let h = ''; for (let p = 0; p < 8; p++) for (let x = 0; x < 128; x++) { let v = 0; for (let b = 0; b < 8; b++) if (d[((p * 8 + b) * 128 + x) * 4 + 2] > 128) v |= 1 << b; h += (v < 16 ? '0' : '') + v.toString(16) } cmd('draw', h) };
+// piano
+const WHITE = [['C', 0], ['D', 2], ['E', 4], ['F', 5], ['G', 7], ['A', 9], ['B', 11], ['C', 12]], BLACK = [[1, 0], [3, 1], [6, 3], [8, 4], [10, 5]];
+WHITE.forEach(([n, s]) => { const k = document.createElement('div'); k.className = 'w'; k.textContent = n; k.dataset.n = s; $('#piano').appendChild(k) });
+BLACK.forEach(([s, after]) => { const k = document.createElement('div'); k.className = 'k'; k.dataset.n = s; k.style.left = ((after + 1) * 12.5 - 4.25) + '%'; $('#piano').appendChild(k) });
+$$('#piano div').forEach(k => { k.addEventListener('pointerdown', e => { e.preventDefault(); k.classList.add('dn'); buzz(8); T.call('tone?n=' + k.dataset.n) }); ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => k.addEventListener(t, () => k.classList.remove('dn'))) });
+// settings
+$$('.seg[data-k]').forEach(g => $$('.seg[data-k=' + g.dataset.k + '] button').forEach((b, i) => b.onclick = () => { $$('.seg[data-k=' + g.dataset.k + '] button').forEach((x, j) => x.setAttribute('aria-pressed', i === j)); cmd('set?k=' + g.dataset.k + '&v=' + i) }));
+$$('.sw[data-k]').forEach(w => w.onclick = () => { const v = w.getAttribute('aria-checked') !== 'true'; w.setAttribute('aria-checked', v); cmd('set?k=' + w.dataset.k + '&v=' + (v ? 1 : 0)) });
+$('#relay').value = store.get('melice.relay', '');
+$('#relaySave').onclick = () => { store.set('melice.relay', $('#relay').value.trim()); location.reload() };
+// tabs
+function showView(v) { $$('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.v === v)); $$('.view').forEach(x => x.hidden = x.dataset.view !== v); store.set('melice.tab', v) }
+$$('.tab').forEach(t => t.onclick = () => showView(t.dataset.v)); showView(store.get('melice.tab', 'play'));
+
+// ---------------------------------------------------------------- start
+function gate(err) { $('#codeGate').hidden = false; $('#codeErr').textContent = err || ''; $('#codeIn').value = store.get('melice.code', ''); setTimeout(() => $('#codeIn').focus(), 50) }
+$('#codeGo').onclick = () => { const c = $('#codeIn').value.trim().toLowerCase(); if (!/^[a-z0-9]{8}$/.test(c)) return $('#codeErr').textContent = 'The code has 8 letters and numbers.'; store.set('melice.code', c); location.reload() };
+$('#codeIn').onkeydown = e => { if (e.key === 'Enter') $('#codeGo').click() };
+$('#changeCode').onclick = () => gate();
+if (LOCAL) {
+  $('#modeNote').textContent = 'You opened this page from MELICE on your home WiFi, so it talks to her directly. To control her from anywhere, open the MELICE Remote website and enter the code below.';
+  $('#remoteOnly').hidden = true; startLocal();
+} else {
+  const code = store.get('melice.code', '');
+  $('#modeNote').textContent = 'Connected through the internet relay, so this works from anywhere. MELICE must be online on her WiFi.';
+  if (!/^[a-z0-9]{8}$/.test(code)) gate(); else { $('#codeShow').textContent = code; startRemote(code) }
+}
+</script>
+</body>
+</html>
